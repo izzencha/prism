@@ -131,7 +131,6 @@
         </div>
         <textarea id="post-content-input" placeholder="What's on your mind?" class="w-full h-24 bg-zinc-900/90 rounded-xl p-3 text-xs text-white placeholder-zinc-500 focus:outline-none border border-zinc-800 resize-none"></textarea>
         
-        <!-- File Picker for Local Image Upload (No links needed!) -->
         <div class="space-y-1">
           <label class="block text-[11px] text-zinc-400">Upload Image / Media from Device</label>
           <input id="post-media-file" type="file" accept="image/*" class="w-full bg-zinc-900 text-xs text-zinc-300 rounded-xl p-2 border border-zinc-800 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white file:text-black hover:file:bg-zinc-200 cursor-pointer" />
@@ -144,6 +143,39 @@
             <option value="reel">TikTok (Reel)</option>
           </select>
           <button onclick="publishPost()" class="bg-white text-black font-bold text-xs px-5 py-2 rounded-xl active:scale-95 transition">Post</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDIT ACCOUNT MODAL -->
+    <div id="edit-account-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
+      <div class="glass-card w-full max-w-sm rounded-2xl p-4 space-y-4 shadow-2xl">
+        <div class="flex justify-between items-center border-b border-zinc-800 pb-2">
+          <h3 class="text-sm font-bold text-white">Edit Profile & Account</h3>
+          <button onclick="closeEditModal()" class="p-1 rounded-lg hover:bg-zinc-800 text-zinc-400"><i data-lucide="x" class="w-4 h-4"></i></button>
+        </div>
+        <div class="space-y-3 text-left">
+          <div><label class="block text-xs text-zinc-400 mb-1">Display Name</label><input id="edit-name-input" type="text" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
+          <div><label class="block text-xs text-zinc-400 mb-1">Username Handle</label><input id="edit-handle-input" type="text" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
+          
+          <div class="space-y-1">
+            <label class="block text-xs text-zinc-400">Update Profile Picture</label>
+            <input id="edit-avatar-file" type="file" accept="image/*" class="w-full bg-zinc-900 text-xs text-zinc-300 rounded-xl p-2 border border-zinc-800 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white file:text-black hover:file:bg-zinc-200 cursor-pointer" />
+          </div>
+
+          <div>
+            <label class="block text-xs text-zinc-400 mb-1">Account Category</label>
+            <select id="edit-category-select" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none">
+              <option value="business">🏢 Official Business / Brand</option>
+              <option value="artist">🎨 Artist / Visual Designer</option>
+              <option value="singer">🎤 Singer / Musician</option>
+              <option value="actor">🎬 Actor / Performer</option>
+              <option value="creator">✨ Digital Creator</option>
+            </select>
+          </div>
+
+          <div><label class="block text-xs text-zinc-400 mb-1">Bio</label><textarea id="edit-bio-input" class="w-full h-16 bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none resize-none"></textarea></div>
+          <button onclick="saveEditAccount()" class="w-full bg-white text-black font-bold text-xs py-3 rounded-xl active:scale-95 transition">Save Changes</button>
         </div>
       </div>
     </div>
@@ -174,6 +206,14 @@
     let userAccount = JSON.parse(localStorage.getItem('prism_account')) || null;
     let userProfile = JSON.parse(localStorage.getItem('prism_user')) || null;
 
+    // Purge old corrupted follower stats or missing bio
+    if (userProfile) {
+      if (typeof userProfile.followers !== 'number' || userProfile.followers > 1000) userProfile.followers = 0;
+      if (typeof userProfile.following !== 'number' || userProfile.following > 1000) userProfile.following = 0;
+      if (!userProfile.bio) userProfile.bio = 'Digital Creator on prism network.';
+      localStorage.setItem('prism_user', JSON.stringify(userProfile));
+    }
+
     // Blank Vector Avatar Generator
     function getBlankAvatarSVG() {
       return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%2318181b"/><circle cx="50" cy="38" r="22" fill="%2352525b"/><path d="M15 88 C15 65, 85 65, 85 88" fill="%2352525b"/></svg>`;
@@ -203,13 +243,6 @@
     let posts = JSON.parse(localStorage.getItem('prism_server_posts')) || [];
     let chatList = JSON.parse(localStorage.getItem('prism_server_chats')) || [];
     let registeredUsers = JSON.parse(localStorage.getItem('prism_server_users')) || [];
-
-    // Reset corrupted follower cache if present
-    if (userProfile && userProfile.followers > 1000) {
-      userProfile.followers = 0;
-      userProfile.following = 0;
-      localStorage.setItem('prism_user', JSON.stringify(userProfile));
-    }
 
     function applyPreferences() {
       const body = document.getElementById('app-body');
@@ -307,6 +340,45 @@
 
     function openModal() { document.getElementById('create-modal').classList.remove('hidden'); }
     function closeModal() { document.getElementById('create-modal').classList.add('hidden'); }
+
+    function openEditModal() {
+      if (!userProfile) return;
+      document.getElementById('edit-name-input').value = userProfile.name;
+      document.getElementById('edit-handle-input').value = userProfile.handle;
+      document.getElementById('edit-category-select').value = userProfile.category || 'creator';
+      document.getElementById('edit-bio-input').value = userProfile.bio || '';
+      document.getElementById('edit-account-modal').classList.remove('hidden');
+    }
+    function closeEditModal() { document.getElementById('edit-account-modal').classList.add('hidden'); }
+
+    function saveEditAccount() {
+      const name = document.getElementById('edit-name-input').value.trim();
+      const handle = document.getElementById('edit-handle-input').value.trim();
+      const category = document.getElementById('edit-category-select').value;
+      const bio = document.getElementById('edit-bio-input').value.trim();
+      const fileElem = document.getElementById('edit-avatar-file');
+
+      if (!name || !handle) return alert('Name and handle cannot be empty');
+
+      const applyUpdates = (newAvatar) => {
+        userProfile.name = name;
+        userProfile.handle = handle.startsWith('@') ? handle : '@' + handle;
+        userProfile.category = category;
+        userProfile.bio = bio;
+        if (newAvatar) userProfile.avatar = newAvatar;
+        saveServerState();
+        closeEditModal();
+        render();
+      };
+
+      if (fileElem.files && fileElem.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) { applyUpdates(e.target.result); };
+        reader.readAsDataURL(fileElem.files[0]);
+      } else {
+        applyUpdates(null);
+      }
+    }
 
     function publishPost() {
       const content = document.getElementById('post-content-input').value.trim();
@@ -418,7 +490,6 @@
               <div><label class="block text-xs text-zinc-400 mb-1">Display Name</label><input id="setup-name-input" type="text" placeholder="Your Name or Brand" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
               <div><label class="block text-xs text-zinc-400 mb-1">Username Handle</label><input id="setup-handle-input" type="text" placeholder="@handle" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
               
-              <!-- Local Image File Picker for PFP -->
               <div class="space-y-1">
                 <label class="block text-xs text-zinc-400">Profile Picture (Upload from Device)</label>
                 <input id="setup-avatar-file" type="file" accept="image/*" class="w-full bg-zinc-900 text-xs text-zinc-300 rounded-xl p-2 border border-zinc-800 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white file:text-black hover:file:bg-zinc-200 cursor-pointer" />
@@ -449,7 +520,6 @@
           <div class="glass-card rounded-2xl p-4 space-y-4">
             <h3 class="text-sm font-bold text-white border-b border-zinc-800 pb-2">Prism Settings & Hub</h3>
             
-            <!-- Category Badge Update -->
             <div class="space-y-2">
               <label class="block text-xs font-semibold text-zinc-200">Account Recognition Badge</label>
               <select onchange="userProfile.category = this.value; saveServerState(); render();" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none">
@@ -461,7 +531,6 @@
               </select>
             </div>
 
-            <!-- Upload New PFP File -->
             <div class="space-y-1">
               <label class="block text-xs font-semibold text-zinc-200">Update Profile Picture (From Device)</label>
               <input id="settings-avatar-file" type="file" accept="image/*" onchange="
@@ -626,7 +695,13 @@
 
       return `
         <div class="space-y-4">
-          <div class="glass-card rounded-2xl p-4 text-center space-y-3">
+          <div class="glass-card rounded-2xl p-4 text-center space-y-3 relative">
+            <!-- Edit Profile Button -->
+            <button onclick="openEditModal()" class="absolute top-4 right-4 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 text-xs px-3 py-1.5 rounded-xl font-semibold transition active:scale-95 flex items-center space-x-1">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              <span>Edit Profile</span>
+            </button>
+
             <img src="${userProfile.avatar}" class="w-20 h-20 rounded-full mx-auto object-cover border-2 border-white/20 shadow-md" />
             <div>
               <div class="flex items-center justify-center space-x-1 flex-wrap">
@@ -636,13 +711,12 @@
               <div class="mt-1">${getCategoryBadge(userProfile.category)}</div>
               <p class="text-xs text-zinc-400 mt-1">${userProfile.handle}</p>
             </div>
-            <p class="text-xs text-zinc-300 leading-relaxed">${userProfile.bio}</p>
+            <p class="text-xs text-zinc-300 leading-relaxed px-2">${userProfile.bio || 'Digital Creator on prism network.'}</p>
             
-            <!-- Followers & Following now cleanly display organic numbers (0 for new users) -->
             <div class="flex justify-center space-x-6 py-2 border-t border-b border-zinc-800/60 text-xs">
               <div><strong class="block text-white text-sm">${myPosts.length}</strong><span class="text-zinc-500">Posts</span></div>
-              <div><strong class="block text-white text-sm">${userProfile.followers}</strong><span class="text-zinc-500">Followers</span></div>
-              <div><strong class="block text-white text-sm">${userProfile.following}</strong><span class="text-zinc-500">Following</span></div>
+              <div><strong class="block text-white text-sm">${Number(userProfile.followers) || 0}</strong><span class="text-zinc-500">Followers</span></div>
+              <div><strong class="block text-white text-sm">${Number(userProfile.following) || 0}</strong><span class="text-zinc-500">Following</span></div>
             </div>
           </div>
 
