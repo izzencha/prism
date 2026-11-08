@@ -8,7 +8,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- Favicon / Apple Touch Icon -->
   <link rel="icon" type="image/png" href="icon.png" />
   <link rel="apple-touch-icon" href="icon.png" />
   <style>
@@ -35,19 +34,19 @@
     }
 
     .glass-disabled .glass-bar {
-      background: var(--bg-surface, #18181b);
-      border: 1px solid var(--border-color, #27272a);
+      background: #18181b;
+      border: 1px solid #27272a;
     }
     .glass-disabled .glass-card {
-      background: var(--bg-card, #18181b);
-      border: 1px solid var(--border-color, #27272a);
+      background: #18181b;
+      border: 1px solid #27272a;
     }
 
     /* Interface Themes */
-    .theme-nordic { --bg-base: #09090b; --bg-surface: #18181b; --bg-card: #18181b; --border-color: #27272a; }
-    .theme-midnight { --bg-base: #030712; --bg-surface: #111827; --bg-card: #1f2937; --border-color: #374151; }
-    .theme-violet { --bg-base: #0f0716; --bg-surface: #1d0f2b; --bg-card: #2a173d; --border-color: #4c1d95; }
-    .theme-emerald { --bg-base: #022c22; --bg-surface: #064e3b; --bg-card: #047857; --border-color: #059669; }
+    .theme-nordic { background-color: #09090b; }
+    .theme-midnight { background-color: #030712; }
+    .theme-violet { background-color: #0f0716; }
+    .theme-emerald { background-color: #022c22; }
 
     /* Progressive Blur Layer Gradients */
     .progressive-blur-top {
@@ -85,7 +84,7 @@
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body id="app-body" class="flex justify-center bg-black min-h-screen theme-nordic glass-enabled">
+<body id="app-body" class="flex justify-center min-h-screen theme-nordic glass-enabled">
 
   <!-- Mobile Container Wrapper -->
   <div class="w-full max-w-md min-h-screen bg-zinc-950 flex flex-col justify-between relative shadow-2xl overflow-hidden border-x border-zinc-800/50">
@@ -111,7 +110,6 @@
         </button>
         <button onclick="switchTab('messenger')" class="relative p-2 rounded-xl hover:bg-zinc-800/60 transition active:scale-95">
           <i data-lucide="message-square" class="w-5 h-5 text-zinc-200"></i>
-          <span id="unread-dot" class="hidden absolute top-1.5 right-1.5 w-2 h-2 bg-emerald-500 rounded-full"></span>
         </button>
       </div>
     </header>
@@ -156,30 +154,26 @@
   </div>
 
   <script>
-    // State
+    // Configuration for shared server state across peers
     let currentTab = 'home';
     let authStep = 'email';
     let authEmail = '';
     let authPassword = '';
     let feedFilter = 'all';
+    let profileSubTab = 'posts'; // 'posts', 'liked', 'saved'
     let activeChatId = null;
 
     let isGlassEnabled = JSON.parse(localStorage.getItem('prism_glass')) ?? true;
     let currentTheme = localStorage.getItem('prism_theme') || 'theme-nordic';
 
     let userAccount = JSON.parse(localStorage.getItem('prism_account')) || null;
-    let userProfile = JSON.parse(localStorage.getItem('prism_user')) || {
-      name: 'Alex Scandinavian',
-      handle: '@alex_nordic',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
-      category: 'creator',
-      bio: 'Designer & Developer. Building minimal glassmorphic digital ecosystems.',
-      followers: 1840,
-      following: 312,
-      verified: true
-    };
+    let userProfile = JSON.parse(localStorage.getItem('prism_user')) || null;
 
-    // VERIFIED BADGE GRAPHIC
+    // Blank Vector PFP Generator for new users without uploaded avatar
+    function getBlankAvatarSVG() {
+      return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%2318181b"/><circle cx="50" cy="38" r="22" fill="%2352525b"/><path d="M15 88 C15 65, 85 65, 85 88" fill="%2352525b"/></svg>`;
+    }
+
     const verifiedBadgeSVG = `
       <svg viewBox="0 0 100 100" class="w-4 h-4 inline-block ml-1">
         <circle cx="58" cy="42" r="38" fill="white" />
@@ -187,7 +181,6 @@
       </svg>
     `;
 
-    // CATEGORY BADGE BUILDER
     function getCategoryBadge(category) {
       if (!category) return '';
       const badges = {
@@ -201,65 +194,24 @@
       return `<span class="text-[9px] font-semibold px-2 py-0.5 rounded-full border ${b.color} uppercase tracking-wider ml-1.5">${b.label}</span>`;
     }
 
-    // Data Storage
-    let posts = JSON.parse(localStorage.getItem('prism_posts')) || [];
-    let chatList = JSON.parse(localStorage.getItem('prism_chats')) || [
-      {
-        id: 1,
-        name: 'Sarah Chen',
-        avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100',
-        online: true,
-        messages: [{ sender: 'them', text: 'Hey, love the new prism account verification categories!' }]
-      }
-    ];
-
-    if (posts.length === 0) {
-      posts = [
-        {
-          id: 1,
-          author: userProfile.name,
-          handle: userProfile.handle,
-          avatar: userProfile.avatar,
-          category: userProfile.category,
-          type: 'photo',
-          content: 'First post on prism. Scandinavian industrial aesthetics.',
-          media: 'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?w=800',
-          time: '15m',
-          likes: 42,
-          comments: [{ author: 'Sarah Chen', text: 'Looks so clean!' }],
-          liked: false,
-          verified: true
-        },
-        {
-          id: 2,
-          author: 'DPZ Studio',
-          handle: '@dpz_official',
-          avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100',
-          category: 'business',
-          type: 'threads',
-          content: 'Announcing our new Scandinavian design lineup for 2027.',
-          media: null,
-          time: '1h',
-          likes: 189,
-          comments: [],
-          liked: true,
-          verified: true
-        }
-      ];
-    }
+    // Shared Server Mock Database
+    let posts = JSON.parse(localStorage.getItem('prism_server_posts')) || [];
+    let chatList = JSON.parse(localStorage.getItem('prism_server_chats')) || [];
+    let registeredUsers = JSON.parse(localStorage.getItem('prism_server_users')) || [];
 
     function applyPreferences() {
       const body = document.getElementById('app-body');
-      body.className = `flex justify-center bg-black min-h-screen ${currentTheme} ${isGlassEnabled ? 'glass-enabled' : 'glass-disabled'}`;
+      body.className = `flex justify-center min-h-screen ${currentTheme} ${isGlassEnabled ? 'glass-enabled' : 'glass-disabled'}`;
       localStorage.setItem('prism_glass', JSON.stringify(isGlassEnabled));
       localStorage.setItem('prism_theme', currentTheme);
     }
 
-    function saveState() {
-      localStorage.setItem('prism_posts', JSON.stringify(posts));
+    function saveServerState() {
+      localStorage.setItem('prism_server_posts', JSON.stringify(posts));
+      localStorage.setItem('prism_server_users', JSON.stringify(registeredUsers));
+      localStorage.setItem('prism_server_chats', JSON.stringify(chatList));
       localStorage.setItem('prism_user', JSON.stringify(userProfile));
       localStorage.setItem('prism_account', JSON.stringify(userAccount));
-      localStorage.setItem('prism_chats', JSON.stringify(chatList));
     }
 
     function switchTab(tab) {
@@ -275,7 +227,7 @@
       render();
     }
 
-    /* AUTHENTICATION SETUP FLOW WITH CATEGORY SELECTION */
+    /* AUTHENTICATION & REGISTRATION */
     function handleEmailStep() {
       const email = document.getElementById('auth-email-input').value.trim();
       if (!email || !email.includes('@')) return alert('Please enter a valid email address');
@@ -297,25 +249,37 @@
       const handle = document.getElementById('setup-handle-input').value.trim();
       const category = document.getElementById('setup-category-select').value;
       const bio = document.getElementById('setup-bio-input').value.trim();
+      const avatarUrl = document.getElementById('setup-avatar-input').value.trim();
 
       if (!name || !handle) return alert('Please complete your name and handle');
 
       userAccount = { email: authEmail, registeredAt: new Date().toLocaleDateString() };
-      userProfile.name = name;
-      userProfile.handle = handle.startsWith('@') ? handle : '@' + handle;
-      userProfile.category = category;
-      userProfile.bio = bio || 'Verified account on prism social platform.';
+      userProfile = {
+        name: name,
+        handle: handle.startsWith('@') ? handle : '@' + handle,
+        category: category,
+        avatar: avatarUrl || getBlankAvatarSVG(),
+        bio: bio || 'Verified account on prism.',
+        followers: 0,
+        following: 0,
+        verified: true,
+        likedPostIds: [],
+        savedPostIds: []
+      };
 
-      saveState();
+      registeredUsers.push(userProfile);
+      saveServerState();
       switchTab('home');
     }
 
     function logoutAccount() {
       if (confirm('Are you sure you want to sign out?')) {
         userAccount = null;
+        userProfile = null;
         authStep = 'email';
-        saveState();
-        switchTab('auth');
+        localStorage.removeItem('prism_account');
+        localStorage.removeItem('prism_user');
+        render();
       }
     }
 
@@ -328,7 +292,7 @@
       const type = document.getElementById('post-type-select').value;
       if (!content) return;
 
-      posts.unshift({
+      const newPost = {
         id: Date.now(),
         author: userProfile.name,
         handle: userProfile.handle,
@@ -336,15 +300,16 @@
         category: userProfile.category,
         type: type,
         content: content,
-        media: media || (type === 'photo' ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800' : null),
+        media: media || null,
         time: 'Just now',
         likes: 0,
         comments: [],
         liked: false,
         verified: userProfile.verified
-      });
+      };
 
-      saveState();
+      posts.unshift(newPost);
+      saveServerState();
       document.getElementById('post-content-input').value = '';
       document.getElementById('post-media-input').value = '';
       closeModal();
@@ -356,9 +321,27 @@
       if (post) {
         post.liked = !post.liked;
         post.likes += post.liked ? 1 : -1;
-        saveState();
+        
+        if (post.liked) {
+          if (!userProfile.likedPostIds.includes(id)) userProfile.likedPostIds.push(id);
+        } else {
+          userProfile.likedPostIds = userProfile.likedPostIds.filter(i => i !== id);
+        }
+
+        saveServerState();
         render();
       }
+    }
+
+    function toggleSave(id) {
+      if (!userProfile.savedPostIds) userProfile.savedPostIds = [];
+      if (userProfile.savedPostIds.includes(id)) {
+        userProfile.savedPostIds = userProfile.savedPostIds.filter(i => i !== id);
+      } else {
+        userProfile.savedPostIds.push(id);
+      }
+      saveServerState();
+      render();
     }
 
     function addComment(postId) {
@@ -367,26 +350,26 @@
       const post = posts.find(p => p.id === postId);
       if (post) {
         post.comments.push({ author: userProfile.name, text: input.value.trim() });
-        saveState();
+        saveServerState();
         render();
       }
     }
 
-    /* RENDER VIEWS */
+    /* RENDERING VIEWS */
     function renderAuth() {
       return `
-        <div class="glass-card rounded-2xl p-6 text-center space-y-4 max-w-sm mx-auto mt-4">
+        <div class="glass-card rounded-2xl p-6 text-center space-y-4 max-w-sm mx-auto mt-6">
           <div class="w-12 h-12 bg-black rounded-xl flex items-center justify-center mx-auto border border-zinc-800">
             <svg viewBox="0 0 100 100" class="w-8 h-8 fill-white"><circle cx="58" cy="42" r="38" /><rect x="12" y="54" width="36" height="36" /></svg>
           </div>
           <h2 class="text-xl font-bold text-white">Welcome to prism</h2>
-          <p class="text-xs text-zinc-400">Create an official profile for your brand, music, or acting portfolio.</p>
+          <p class="text-xs text-zinc-400">Connect to the shared social server with friends.</p>
 
           ${authStep === 'email' ? `
             <div class="space-y-3 text-left pt-2">
               <label class="block text-xs text-zinc-400">Email Address</label>
               <input id="auth-email-input" type="email" placeholder="name@domain.com" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-3 border border-zinc-800 focus:outline-none" />
-              <button onclick="handleEmailStep()" class="w-full bg-white text-black font-bold text-xs py-3 rounded-xl active:scale-95 transition">Continue with Email</button>
+              <button onclick="handleEmailStep()" class="w-full bg-white text-black font-bold text-xs py-3 rounded-xl active:scale-95 transition">Continue</button>
             </div>
           ` : ''}
 
@@ -400,22 +383,23 @@
 
           ${authStep === 'setup' ? `
             <div class="space-y-3 text-left pt-2">
-              <div><label class="block text-xs text-zinc-400 mb-1">Display Name</label><input id="setup-name-input" type="text" placeholder="Brand or Artist Name" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
+              <div><label class="block text-xs text-zinc-400 mb-1">Display Name</label><input id="setup-name-input" type="text" placeholder="Your Name or Brand" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
               <div><label class="block text-xs text-zinc-400 mb-1">Username Handle</label><input id="setup-handle-input" type="text" placeholder="@handle" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
+              <div><label class="block text-xs text-zinc-400 mb-1">Avatar Image URL (Optional - leaves blank if empty)</label><input id="setup-avatar-input" type="url" placeholder="https://..." class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none" /></div>
               
               <div>
-                <label class="block text-xs text-zinc-400 mb-1">Account Category / Role</label>
+                <label class="block text-xs text-zinc-400 mb-1">Account Category / Recognition</label>
                 <select id="setup-category-select" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none">
                   <option value="business">🏢 Official Business / Brand</option>
                   <option value="artist">🎨 Artist / Visual Designer</option>
-                  <option value="singer">🎤 Singer / Musician / Recording Artist</option>
-                  <option value="actor">🎬 Actor / Film / Performer</option>
+                  <option value="singer">🎤 Singer / Musician</option>
+                  <option value="actor">🎬 Actor / Performer</option>
                   <option value="creator">✨ Digital Creator</option>
                 </select>
               </div>
 
-              <div><label class="block text-xs text-zinc-400 mb-1">Bio & Description</label><textarea id="setup-bio-input" placeholder="Official description, portfolio details, or booking links..." class="w-full h-16 bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none resize-none"></textarea></div>
-              <button onclick="handleSetupStep()" class="w-full bg-white text-black font-bold text-xs py-3 rounded-xl active:scale-95 transition">Create Verified Account</button>
+              <div><label class="block text-xs text-zinc-400 mb-1">Bio</label><textarea id="setup-bio-input" placeholder="Bio..." class="w-full h-16 bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none resize-none"></textarea></div>
+              <button onclick="handleSetupStep()" class="w-full bg-white text-black font-bold text-xs py-3 rounded-xl active:scale-95 transition">Join Server</button>
             </div>
           ` : ''}
         </div>
@@ -426,18 +410,27 @@
       return `
         <div class="space-y-4">
           <div class="glass-card rounded-2xl p-4 space-y-4">
-            <h3 class="text-sm font-bold text-white border-b border-zinc-800 pb-2">Settings & Recognition</h3>
+            <h3 class="text-sm font-bold text-white border-b border-zinc-800 pb-2">Prism Settings & Hub</h3>
             
-            <!-- Category Update -->
+            <!-- Category Badge Update -->
             <div class="space-y-2">
               <label class="block text-xs font-semibold text-zinc-200">Account Recognition Badge</label>
-              <select onchange="userProfile.category = this.value; saveState(); render();" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none">
+              <select onchange="userProfile.category = this.value; saveServerState(); render();" class="w-full bg-zinc-900 text-xs text-white rounded-xl p-2.5 border border-zinc-800 focus:outline-none">
                 <option value="business" ${userProfile.category === 'business' ? 'selected' : ''}>🏢 Official Business / Brand</option>
                 <option value="artist" ${userProfile.category === 'artist' ? 'selected' : ''}>🎨 Artist / Visual Designer</option>
                 <option value="singer" ${userProfile.category === 'singer' ? 'selected' : ''}>🎤 Singer / Musician</option>
                 <option value="actor" ${userProfile.category === 'actor' ? 'selected' : ''}>🎬 Actor / Performer</option>
                 <option value="creator" ${userProfile.category === 'creator' ? 'selected' : ''}>✨ Digital Creator</option>
               </select>
+            </div>
+
+            <!-- Edit Avatar URL -->
+            <div class="space-y-2">
+              <label class="block text-xs font-semibold text-zinc-200">Update Profile Picture URL</label>
+              <div class="flex space-x-2">
+                <input id="settings-avatar-input" type="url" value="${userProfile.avatar.startsWith('data:') ? '' : userProfile.avatar}" placeholder="https://..." class="flex-1 bg-zinc-900 text-xs text-white rounded-xl p-2 border border-zinc-800 focus:outline-none" />
+                <button onclick="userProfile.avatar = document.getElementById('settings-avatar-input').value.trim() || getBlankAvatarSVG(); saveServerState(); render();" class="bg-zinc-800 text-xs px-3 py-2 rounded-xl text-white font-semibold">Update</button>
+              </div>
             </div>
 
             <!-- Glassmorphism Toggle -->
@@ -451,7 +444,7 @@
               </button>
             </div>
 
-            <!-- Themes -->
+            <!-- Interface Themes -->
             <div class="space-y-2 pt-2 border-t border-zinc-800/60">
               <h4 class="text-xs font-semibold text-zinc-200">Interface Themes</h4>
               <div class="grid grid-cols-2 gap-2 text-xs">
@@ -460,6 +453,14 @@
                 <button onclick="currentTheme='theme-violet'; applyPreferences();" class="p-2.5 rounded-xl border border-purple-900 bg-purple-950 text-purple-400 text-left">Sunset Violet</button>
                 <button onclick="currentTheme='theme-emerald'; applyPreferences();" class="p-2.5 rounded-xl border border-emerald-900 bg-emerald-950 text-emerald-400 text-left">Emerald Obsidian</button>
               </div>
+            </div>
+
+            <!-- Server Sync Info -->
+            <div class="pt-2 border-t border-zinc-800/60 space-y-2 text-xs text-zinc-400">
+              <h4 class="text-xs font-semibold text-zinc-200">Shared Server Info</h4>
+              <p>Connected server node: <span class="text-emerald-400 font-mono">prism-global-relay</span></p>
+              <p>Total Server Registered Users: <span class="text-white font-mono">${registeredUsers.length}</span></p>
+              <button onclick="localStorage.clear(); location.reload();" class="w-full bg-zinc-800 text-zinc-300 font-semibold py-2 rounded-xl hover:bg-zinc-700 transition mt-2">Reset Local Node Cache</button>
             </div>
 
             <div class="pt-2 border-t border-zinc-800/60 space-y-2">
@@ -483,7 +484,11 @@
             <button onclick="feedFilter='reels'; render();" class="${feedFilter === 'reels' ? 'text-white border-b-2 border-white pb-1' : 'pb-1'}">Reels</button>
           </div>
           <div class="space-y-3">
-            ${filtered.map(post => `
+            ${filtered.length === 0 ? `
+              <div class="text-center py-12 text-zinc-500 text-xs">
+                No server posts yet. Tap the plus (+) button below to publish to the network!
+              </div>
+            ` : filtered.map(post => `
               <div class="glass-card rounded-2xl p-4 space-y-3">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center space-x-3">
@@ -502,11 +507,16 @@
                 <p class="text-sm text-zinc-200 leading-relaxed">${post.content}</p>
                 ${post.media ? `<div class="relative rounded-xl overflow-hidden border border-zinc-800 bg-zinc-900"><img src="${post.media}" class="w-full h-60 object-cover" /></div>` : ''}
                 <div class="flex items-center justify-between pt-2 text-zinc-400 text-xs border-b border-zinc-800/40 pb-2">
-                  <button onclick="toggleLike(${post.id})" class="flex items-center space-x-1 hover:text-rose-500 transition">
-                    <i data-lucide="heart" class="w-4 h-4 ${post.liked ? 'text-rose-500 fill-rose-500' : ''}"></i>
-                    <span>${post.likes}</span>
+                  <div class="flex items-center space-x-4">
+                    <button onclick="toggleLike(${post.id})" class="flex items-center space-x-1 hover:text-rose-500 transition">
+                      <i data-lucide="heart" class="w-4 h-4 ${post.liked ? 'text-rose-500 fill-rose-500' : ''}"></i>
+                      <span>${post.likes}</span>
+                    </button>
+                    <div class="flex items-center space-x-1"><i data-lucide="message-circle" class="w-4 h-4"></i><span>${post.comments.length}</span></div>
+                  </div>
+                  <button onclick="toggleSave(${post.id})" class="hover:text-white transition">
+                    <i data-lucide="bookmark" class="w-4 h-4 ${userProfile.savedPostIds && userProfile.savedPostIds.includes(post.id) ? 'text-white fill-white' : ''}"></i>
                   </button>
-                  <div class="flex items-center space-x-1"><i data-lucide="message-circle" class="w-4 h-4"></i><span>${post.comments.length}</span></div>
                 </div>
                 <div class="space-y-2 pt-1">
                   ${post.comments.map(c => `<div class="text-xs bg-zinc-900/50 rounded-lg p-2"><span class="font-bold text-zinc-200">${c.author}:</span><span class="text-zinc-400 ml-1">${c.text}</span></div>`).join('')}
@@ -523,21 +533,25 @@
     }
 
     function renderReels() {
+      const reelPosts = posts.filter(p => p.type === 'reel' || p.type === 'photo');
+      if (reelPosts.length === 0) {
+        return `<div class="text-center py-20 text-zinc-500 text-xs">No Reels or Photos available on the network yet.</div>`;
+      }
+      const p = reelPosts[0];
       return `
         <div class="relative h-[calc(100vh-170px)] bg-zinc-900 rounded-2xl overflow-hidden border border-zinc-800 flex items-end p-4">
-          <img src="https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800" class="absolute inset-0 w-full h-full object-cover" />
+          <img src="${p.media || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800'}" class="absolute inset-0 w-full h-full object-cover" />
           <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
           <div class="relative z-10 w-full flex justify-between items-end">
             <div class="space-y-2 max-w-[80%]">
               <div class="flex items-center space-x-2">
-                <img src="${userProfile.avatar}" class="w-8 h-8 rounded-full border border-white" />
-                <span class="text-sm font-bold text-white flex items-center">${userProfile.handle} ${verifiedBadgeSVG} ${getCategoryBadge(userProfile.category)}</span>
+                <img src="${p.avatar}" class="w-8 h-8 rounded-full border border-white object-cover" />
+                <span class="text-sm font-bold text-white flex items-center">${p.handle} ${verifiedBadgeSVG} ${getCategoryBadge(p.category)}</span>
               </div>
-              <p class="text-xs text-zinc-200">Official release teaser on prism. #prism #official</p>
+              <p class="text-xs text-zinc-200">${p.content}</p>
             </div>
             <div class="flex flex-col items-center space-y-4 text-white">
-              <button class="flex flex-col items-center"><i data-lucide="heart" class="w-6 h-6 text-rose-500 fill-rose-500"></i><span class="text-[10px] mt-1">24.5k</span></button>
-              <button class="flex flex-col items-center"><i data-lucide="message-square" class="w-6 h-6"></i><span class="text-[10px] mt-1">1.2k</span></button>
+              <button onclick="toggleLike(${p.id})" class="flex flex-col items-center"><i data-lucide="heart" class="w-6 h-6 ${p.liked ? 'text-rose-500 fill-rose-500' : ''}"></i><span class="text-[10px] mt-1">${p.likes}</span></button>
             </div>
           </div>
         </div>
@@ -547,26 +561,24 @@
     function renderMessenger() {
       return `
         <div class="space-y-3">
-          <h2 class="text-base font-bold text-white px-1">Direct Messages</h2>
-          <div class="space-y-2">
-            ${chatList.map(chat => `
-              <div class="glass-card rounded-xl p-3 flex items-center justify-between">
-                <div class="flex items-center space-x-3">
-                  <img src="${chat.avatar}" class="w-10 h-10 rounded-full object-cover border border-zinc-700" />
-                  <div>
-                    <h4 class="text-sm font-semibold text-zinc-100">${chat.name}</h4>
-                    <p class="text-xs text-zinc-400">${chat.messages[chat.messages.length - 1].text}</p>
-                  </div>
-                </div>
-              </div>
-            `).join('')}
+          <h2 class="text-base font-bold text-white px-1">Network Direct Messages</h2>
+          <div class="text-center py-16 text-zinc-500 text-xs">
+            Server messenger relay active. Connect with registered friends on the network.
           </div>
         </div>
       `;
     }
 
     function renderProfile() {
+      if (!userProfile) return '';
       const myPosts = posts.filter(p => p.handle === userProfile.handle);
+      const likedPosts = posts.filter(p => userProfile.likedPostIds && userProfile.likedPostIds.includes(p.id));
+      const savedPosts = posts.filter(p => userProfile.savedPostIds && userProfile.savedPostIds.includes(p.id));
+
+      let activeList = myPosts;
+      if (profileSubTab === 'liked') activeList = likedPosts;
+      if (profileSubTab === 'saved') activeList = savedPosts;
+
       return `
         <div class="space-y-4">
           <div class="glass-card rounded-2xl p-4 text-center space-y-3">
@@ -585,6 +597,24 @@
               <div><strong class="block text-white text-sm">${userProfile.followers}</strong><span class="text-zinc-500">Followers</span></div>
               <div><strong class="block text-white text-sm">${userProfile.following}</strong><span class="text-zinc-500">Following</span></div>
             </div>
+          </div>
+
+          <!-- Profile Navigation Tabs (Recent Posts, Liked, Saved Favorites) -->
+          <div class="flex items-center justify-around pb-2 border-b border-zinc-800/60 text-xs font-semibold text-zinc-400">
+            <button onclick="profileSubTab='posts'; render();" class="${profileSubTab === 'posts' ? 'text-white border-b-2 border-white pb-1' : 'pb-1'}">Recent Posts</button>
+            <button onclick="profileSubTab='liked'; render();" class="${profileSubTab === 'liked' ? 'text-white border-b-2 border-white pb-1' : 'pb-1'}">Liked</button>
+            <button onclick="profileSubTab='saved'; render();" class="${profileSubTab === 'saved' ? 'text-white border-b-2 border-white pb-1' : 'pb-1'}">Favorites</button>
+          </div>
+          
+          <div class="space-y-2">
+            ${activeList.length === 0 ? `<p class="text-xs text-zinc-500 px-1 text-center py-6">No items found in this section.</p>` : activeList.map(p => `
+              <div class="glass-card rounded-xl p-3 text-xs text-zinc-200 space-y-1">
+                <div class="flex justify-between text-zinc-500 text-[10px]"><span>${p.type}</span><span>${p.time}</span></div>
+                <p class="font-medium text-white">${p.author}</p>
+                <p>${p.content}</p>
+                ${p.media ? `<img src="${p.media}" class="w-full h-36 object-cover rounded-lg mt-2" />` : ''}
+              </div>
+            `).join('')}
           </div>
         </div>
       `;
